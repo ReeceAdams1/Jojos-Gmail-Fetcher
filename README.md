@@ -41,8 +41,9 @@ The first run opens a browser to authorize. After success, you'll see:
 
 ```text
 usage: fetch_warnme.py [-h] [--credentials CREDENTIALS] [--token TOKEN]
-                       [--limit LIMIT] [--save] [--json]
-                       [--since SINCE] [--until UNTIL]
+                       [--limit LIMIT] [--save] [--json] [--csv [CSV]]
+                       [--latest-text [LATEST_TEXT]] [--since SINCE]
+                       [--until UNTIL]
 
 Fetch Gmail messages from ucberkeley@warnme.berkeley.edu
 
@@ -54,6 +55,9 @@ options:
   --limit LIMIT         Limit number of messages to fetch
   --save                Save full raw .eml files to output/ directory
   --json                Write a messages.json summary file
+  --csv [CSV]           Write extracted incident summary CSV (default: output/messages.csv)
+  --latest-text [LATEST_TEXT]
+                        Write the most recent non-advisory email (header summary + body) to a text file (default: output/latest_warnme.txt)
   --since SINCE         Only messages after this date (YYYY-MM-DD or ISO)
   --until UNTIL         Only messages before this date (YYYY-MM-DD or ISO)
 ```
@@ -61,6 +65,39 @@ options:
 Date filters use Gmail search:
 - `--since 2025-01-01` becomes `after:2025/01/01`
 - `--until 2025-12-31` becomes `before:2025/12/31`
+
+### CSV output
+
+When you pass `--csv` the script fetches full messages and produces a compact CSV with these columns:
+
+| Column | Description |
+|--------|-------------|
+| `email_timestamp` | ISO timestamp parsed from the Gmail header (message send time). |
+| `incident_date` | Date of the incident in `MM/DD/YY` extracted from the narrative. Supports numeric (`On 11/03/25 ...`) and month-name (`On November 1st ...`) forms. Blank if no recognizable pattern. |
+| `incident_time` | 24-hour `HH:MM` time if present in the narrative (`at about 2220 hours` -> `22:20`). Blank if the month-name form omits time. |
+| `location` | Location phrase extracted from explicit lines (e.g. `Location: ...`) or narrative patterns (`occurred in the area of`, `occurred at`, `occurred near`). Leading words like "occurred at" removed. |
+| `subject` | Crime type normalized from the WarnMe subject (strips trailing "Reported" / "Report"), otherwise full subject if pattern not matched. |
+
+Removed legacy columns: the earlier `incident_phrase`, `id`, and `body` columns were dropped to keep the CSV small and focused.
+
+Example:
+
+```powershell
+python .\src\fetch_warnme.py --limit 15 --csv
+```
+
+Produces `output/messages.csv` similar to:
+
+```text
+email_timestamp,incident_date,incident_time,location,subject
+2025-11-10T08:50:45-05:00,11/08/25,01:45,,Violent Crime
+2025-11-04T18:52:12-05:00,11/01/25,,,"Violent Crime"
+2025-11-04T02:28:22-05:00,11/03/25,22:20,"the Ridge Lot (2600 block of Ridge Rd)",Robbery
+```
+
+### Latest text export
+
+`--latest-text` saves a single file with high-level header info plus the raw plain text body (HTML stripped if necessary) for quick review.
 
 ## Alternate approach: IMAP with App Password (optional)
 
